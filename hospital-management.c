@@ -6,6 +6,111 @@
 #define DISEASE_LEN 50
 #define PATIENTS_FILE "patients.txt"
 
+#define MAX_COLS 10
+#define CELL_PADDING 2
+
+typedef struct {
+    char* headers[MAX_COLS];
+    char*** data;
+    int* colWidths;
+    int rows;
+    int cols;
+} Table;
+
+void initTable(Table* table, char** headers, int cols) {
+    table->cols = cols;
+    table->rows = 0;
+    table->colWidths = (int*)calloc(cols, sizeof(int));
+    
+    // Initialize headers and find initial column widths
+    for (int i = 0; i < cols; i++) {
+        table->headers[i] = strdup(headers[i]);
+        table->colWidths[i] = strlen(headers[i]) + CELL_PADDING;
+    }
+    
+    table->data = NULL;
+}
+
+void addRow(Table* table, char** rowData) {
+    table->rows++;
+    table->data = (char***)realloc(table->data, table->rows * sizeof(char**));
+    table->data[table->rows - 1] = (char**)malloc(table->cols * sizeof(char*));
+    
+    for (int i = 0; i < table->cols; i++) {
+        table->data[table->rows - 1][i] = strdup(rowData[i]);
+        int cellLen = strlen(rowData[i]) + CELL_PADDING;
+        if (cellLen > table->colWidths[i]) {
+            table->colWidths[i] = cellLen;
+        }
+    }
+}
+
+void printHorizontalLine(Table* table) {
+    printf("+");
+    for (int i = 0; i < table->cols; i++) {
+        for (int j = 0; j < table->colWidths[i]; j++) printf("-");
+        printf("+");
+    }
+    printf("\n");
+}
+
+void printRow(Table* table, char** rowData) {
+    printf("|");
+    for (int i = 0; i < table->cols; i++) {
+        printf("%-*s|", table->colWidths[i], rowData[i]);
+    }
+    printf("\n");
+}
+
+void displayTable(Table* table) {
+    printHorizontalLine(table);
+    
+    // Print headers
+    printf("|");
+    for (int i = 0; i < table->cols; i++) {
+        printf("%-*s|", table->colWidths[i], table->headers[i]);
+    }
+    printf("\n");
+    
+    printHorizontalLine(table);
+    
+    // Print data
+    for (int i = 0; i < table->rows; i++) {
+        printRow(table, table->data[i]);
+    }
+    
+    printHorizontalLine(table);
+}
+
+void freeTable(Table* table) {
+    for (int i = 0; i < table->cols; i++) {
+        free(table->headers[i]);
+    }
+    
+    for (int i = 0; i < table->rows; i++) {
+        for (int j = 0; j < table->cols; j++) {
+            free(table->data[i][j]);
+        }
+        free(table->data[i]);
+    }
+    
+    free(table->data);
+    free(table->colWidths);
+}
+
+// Utility function to convert int to string
+char* itoa_custom(int value, char* result) {
+    static char buffer[20];  // Static buffer for each call
+    sprintf(buffer, "%d", value);
+    return strdup(buffer);   // Return duplicated string
+}
+
+char* ftoa_custom(float value, char* result) {
+    static char buffer[20];
+    sprintf(buffer, "%.2f", value);
+    return strdup(buffer);
+}
+
 typedef struct {
     int id;
     char name[NAME_LEN];
@@ -143,16 +248,31 @@ void viewPatients() {
         return;
     }
 
+    char* headers[] = {"ID", "Name", "Age", "Gender", "Disease"};
+    Table table;
+    initTable(&table, headers, 5);
+    
     for (int i = 0; i < patientCount; i++) {
-        printf("\n-----------------\n");
-        printf("ID: %d\n", patients[i].id);
-        printf("Name: %s\n", patients[i].name);
-        printf("Age: %d\n", patients[i].age);
-        printf("Gender: %c\n", patients[i].gender);
-        printf("Disease: %s\n", patients[i].disease);
+        char* rowData[5];
+        char idStr[20], ageStr[20];
+        sprintf(idStr, "%d", patients[i].id);
+        sprintf(ageStr, "%d", patients[i].age);
+        
+        rowData[0] = strdup(idStr);
+        rowData[1] = strdup(patients[i].name);
+        rowData[2] = strdup(ageStr);
+        char* genderStr = (char*)malloc(2);
+        genderStr[0] = patients[i].gender;
+        genderStr[1] = '\0';
+        rowData[3] = genderStr;
+        rowData[4] = strdup(patients[i].disease);
+        
+        addRow(&table, rowData);
     }
+    
+    displayTable(&table);
+    freeTable(&table);
 }
-
 void searchPatient() {
     int id;
     printf("Enter Patient ID to search: ");
